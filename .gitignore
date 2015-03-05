@@ -28,6 +28,8 @@ contrib/win32/Makefile
 contrib/win32/Makefile.in
 contrib/win32/sys/Makefile
 contrib/win32/sys/Makefile.in
+android/libs/
+android/obj/
 debian/
 depcomp
 examples/*.o
