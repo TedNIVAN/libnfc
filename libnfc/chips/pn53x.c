@@ -1059,6 +1059,7 @@ pn53x_initiator_select_passive_target_ext(struct nfc_device *pnd,
   size_t  szTargetsData = sizeof(abtTargetsData);
   int res = 0;
   nfc_target nttmp;
+  memset(&nttmp, 0x00, sizeof(nfc_target));
 
   if (nm.nmt == NMT_ISO14443BI || nm.nmt == NMT_ISO14443B2SR || nm.nmt == NMT_ISO14443B2CT) {
     if (CHIP_DATA(pnd)->type == RCS360) {
@@ -1148,7 +1149,6 @@ pn53x_initiator_select_passive_target_ext(struct nfc_device *pnd,
     if (! found)
       return 0;
   } else {
-
     const pn53x_modulation pm = pn53x_nm_to_pm(nm);
     if ((PM_UNDEFINED == pm) || (NBR_UNDEFINED == nm.nbr)) {
       pnd->last_error = NFC_EINVARG;
@@ -1221,9 +1221,14 @@ pn53x_initiator_poll_target(struct nfc_device *pnd,
       szTargetTypes++;
     }
     nfc_target ntTargets[2];
+    memset(ntTargets, 0x00, sizeof(nfc_target) * 2);
+
     if ((res = pn53x_InAutoPoll(pnd, apttTargetTypes, szTargetTypes, uiPollNr, uiPeriod, ntTargets, 0)) < 0)
       return res;
     switch (res) {
+      case 0:
+        return pnd->last_error = NFC_SUCCESS;
+        break;
       case 1:
         *pnt = ntTargets[0];
         if (pn53x_current_target_new(pnd, pnt) == NULL) {
@@ -3361,7 +3366,7 @@ pn53x_get_information_about(nfc_device *pnd, char **pbuf)
     }
     buflen -= res;
     const nfc_baud_rate *nbr;
-    if ((res = nfc_device_get_supported_baud_rate(pnd, N_INITIATOR, nmt[i], &nbr)) < 0) {
+    if ((res = nfc_device_get_supported_baud_rate(pnd, nmt[i], &nbr)) < 0) {
       free(*pbuf);
       return res;
     }
@@ -3426,7 +3431,7 @@ pn53x_get_information_about(nfc_device *pnd, char **pbuf)
     }
     buflen -= res;
     const nfc_baud_rate *nbr;
-    if ((res = nfc_device_get_supported_baud_rate(pnd, N_TARGET, nmt[i], &nbr)) < 0) {
+    if ((res = nfc_device_get_supported_baud_rate_target_mode(pnd, nmt[i], &nbr)) < 0) {
       free(*pbuf);
       return res;
     }

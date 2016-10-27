@@ -276,7 +276,7 @@ nfc_open(nfc_context *context, const nfc_connstring connstring)
       log_put(LOG_GROUP, LOG_CATEGORY, NFC_LOG_PRIORITY_DEBUG, "Unable to open \"%s\".", ncs);
       return NULL;
     }
-    for (uint32_t i = 0; i > context->user_defined_device_count; i++) {
+    for (uint32_t i = 0; i < context->user_defined_device_count; i++) {
       if (strcmp(ncs, context->user_defined_devices[i].connstring) == 0) {
         // This is a device sets by user, we use the device name given by user
         strcpy(pnd->name, context->user_defined_devices[i].name);
@@ -482,13 +482,13 @@ nfc_initiator_init(nfc_device *pnd)
 }
 
 /** @ingroup initiator
- * @brief Initialize NFC device as initiator with its secure element initiator (reader)
+ * @brief Initialize NFC device as initiator with its secure element as target (reader)
  * @return Returns 0 on success, otherwise returns libnfc's error code (negative value)
  * @param pnd \a nfc_device struct pointer that represent currently used device
  *
  * The NFC device is configured to function as secure element reader.
  * After initialization it can be used to communicate with the secure element.
- * @note RF field is desactvated in order to some power
+ * @note RF field is deactivated in order to save some power
  */
 int
 nfc_initiator_init_secure_element(nfc_device *pnd)
@@ -1198,18 +1198,31 @@ nfc_device_get_supported_modulation(nfc_device *pnd, const nfc_mode mode, const 
 }
 
 /** @ingroup data
- * @brief Get supported baud rates.
+ * @brief Get supported baud rates (initiator mode).
  * @return Returns 0 on success, otherwise returns libnfc's error code (negative value)
  * @param pnd \a nfc_device struct pointer that represent currently used device
- * @param mode \a nfc_mode.
  * @param nmt \a nfc_modulation_type.
  * @param supported_br pointer of \a nfc_baud_rate array.
  *
  */
 int
-nfc_device_get_supported_baud_rate(nfc_device *pnd, const nfc_mode mode, const nfc_modulation_type nmt, const nfc_baud_rate **const supported_br)
+nfc_device_get_supported_baud_rate(nfc_device *pnd, const nfc_modulation_type nmt, const nfc_baud_rate **const supported_br)
 {
-  HAL(get_supported_baud_rate, pnd, mode, nmt, supported_br);
+  HAL(get_supported_baud_rate, pnd, N_INITIATOR, nmt, supported_br);
+}
+
+/** @ingroup data
+ * @brief Get supported baud rates for target mode.
+ * @return Returns 0 on success, otherwise returns libnfc's error code (negative value)
+ * @param pnd \a nfc_device struct pointer that represent currently used device
+ * @param nmt \a nfc_modulation_type.
+ * @param supported_br pointer of \a nfc_baud_rate array.
+ *
+ */
+int
+nfc_device_get_supported_baud_rate_target_mode(nfc_device *pnd, const nfc_modulation_type nmt, const nfc_baud_rate **const supported_br)
+{
+  HAL(get_supported_baud_rate, pnd, N_TARGET, nmt, supported_br);
 }
 
 /** @ingroup data
@@ -1231,8 +1244,14 @@ nfc_device_validate_modulation(nfc_device *pnd, const nfc_mode mode, const nfc_m
   for (int i = 0; nmt[i]; i++) {
     if (nmt[i] == nm->nmt) {
       const nfc_baud_rate *nbr;
-      if ((res = nfc_device_get_supported_baud_rate(pnd, mode, nmt[i], &nbr)) < 0) {
-        return res;
+      if (mode == N_INITIATOR) {
+        if ((res = nfc_device_get_supported_baud_rate(pnd, nmt[i], &nbr)) < 0) {
+          return res;
+        }
+      } else {
+        if ((res = nfc_device_get_supported_baud_rate_target_mode(pnd, nmt[i], &nbr)) < 0) {
+          return res;
+        }
       }
       for (int j = 0; nbr[j]; j++) {
         if (nbr[j] == nm->nbr)
@@ -1290,7 +1309,7 @@ nfc_device_get_information_about(nfc_device *pnd, char **buf)
 /** @ingroup string-converter
  * @brief Convert \a nfc_baud_rate value to string
  * @return Returns nfc baud rate
- * @param \a nfc_baud_rate to convert
+ * @param nbr \a nfc_baud_rate to convert
 */
 const char *
 str_nfc_baud_rate(const nfc_baud_rate nbr)
@@ -1307,12 +1326,14 @@ str_nfc_baud_rate(const nfc_baud_rate nbr)
     case NBR_847:
       return "847 kbps";
   }
+
+  return "???";
 }
 
 /** @ingroup string-converter
  * @brief Convert \a nfc_modulation_type value to string
  * @return Returns nfc modulation type
- * @param \a nfc_modulation_type to convert
+ * @param nmt \a nfc_modulation_type to convert
 */
 const char *
 str_nfc_modulation_type(const nfc_modulation_type nmt)
@@ -1335,13 +1356,16 @@ str_nfc_modulation_type(const nfc_modulation_type nmt)
     case NMT_DEP:
       return "D.E.P.";
   }
+
+  return "???";
 }
 
 /** @ingroup string-converter
- * @brief Convert \a nfc_modulation_type value to string
+ * @brief Convert \a nfc_target content to string
  * @return Upon successful return, this function returns the number of characters printed (excluding the null byte used to end output to strings), otherwise returns libnfc's error code (negative value)
- * @param nt \a nfc_target struct to print
+ * @param pnt \a nfc_target struct pointer to print
  * @param buf pointer where string will be allocated, then nfc target information printed
+ * @param verbose false for essential, true for detailed, human-readable, information
  *
  * @warning *buf must be freed using nfc_free()
 */

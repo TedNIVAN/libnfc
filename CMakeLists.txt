@@ -1,5 +1,11 @@
-PROJECT(libnfc C)
-CMAKE_MINIMUM_REQUIRED(VERSION 2.6)
+cmake_minimum_required (VERSION 2.6)
+
+if (NOT DEFINED CMAKE_BUILD_TYPE)
+  set (CMAKE_BUILD_TYPE Release CACHE STRING "Build type")
+endif ()
+
+project (libnfc C)
+
 SET(VERSION_MAJOR "1")
 SET(VERSION_MINOR "7")
 SET(VERSION_PATCH "1")
@@ -29,12 +35,12 @@ INCLUDE_DIRECTORIES(${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/incl
 SET(CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake/modules/")
 
 # Options
-SET(LIBNFC_LOG ON CACHE BOOL "Enable log facility (errors, warning, info and debug messages)")
+option (LIBNFC_LOG "Enable log facility (errors, warning, info and debug messages)" ON)
 IF(LIBNFC_LOG)
   ADD_DEFINITIONS(-DLOG)
 ENDIF(LIBNFC_LOG)
 
-SET(LIBNFC_ENVVARS ON CACHE BOOL "Enable envvars facility")
+option (LIBNFC_ENVVARS "Enable envvars facility" ON)
 IF(LIBNFC_ENVVARS)
   ADD_DEFINITIONS(-DENVVARS)
 ENDIF(LIBNFC_ENVVARS)
@@ -49,10 +55,14 @@ ELSE(LIBNFC_DEBUG_MODE)
   SET(WIN32_MODE "release")
 ENDIF(LIBNFC_DEBUG_MODE)
 
-SET(LIBNFC_CONFFILES_MODE ON CACHE BOOL "Enable configuration files")
+option (LIBNFC_CONFFILES_MODE "Enable configuration files" ON)
 IF(LIBNFC_CONFFILES_MODE)
   ADD_DEFINITIONS(-DCONFFILES)
 ENDIF(LIBNFC_CONFFILES_MODE)
+
+option (BUILD_EXAMPLES "build examples ON/OFF" ON)
+option (BUILD_UTILS "build utils ON/OFF" ON)
+
 
 # Doxygen
 SET(builddir "${CMAKE_BINARY_DIR}")
@@ -112,15 +122,6 @@ IF(NOT WIN32)
   INSTALL(FILES ${CMAKE_CURRENT_BINARY_DIR}/libnfc.pc DESTINATION ${CMAKE_INSTALL_LIBDIR}/pkgconfig)
 ENDIF(NOT WIN32)
 
-# Require PCRE for Win32
-IF (WIN32)
-  FIND_PACKAGE(PCRE REQUIRED)
-  IF(PCRE_INCLUDE_DIRS)
-    INCLUDE_DIRECTORIES(${PCRE_INCLUDE_DIRS})
-    LINK_DIRECTORIES(${PCRE_LIBRARY_DIRS})
-  ENDIF(PCRE_INCLUDE_DIRS)
-ENDIF(WIN32)
-
 INCLUDE(LibnfcDrivers)
 
 IF(PCSC_INCLUDE_DIRS)
@@ -154,8 +155,69 @@ ENDIF(WIN32)
 
 ADD_SUBDIRECTORY(libnfc)
 ADD_SUBDIRECTORY(include)
-ADD_SUBDIRECTORY(utils)
-ADD_SUBDIRECTORY(examples)
+
+if (BUILD_UTILS)
+  add_subdirectory (utils)
+endif ()
+
+if (BUILD_EXAMPLES)
+  add_subdirectory (examples)
+endif ()
+
+if (NOT MSVC)
+  # config script install path
+  if ( NOT DEFINED LIBNFC_CMAKE_CONFIG_DIR )
+    set ( LIBNFC_CMAKE_CONFIG_DIR lib${LIB_SUFFIX}/cmake/libnfc )
+  endif ()
+
+  set ( LIBNFC_INCLUDE_DIR ${includedir} )
+  set ( LIBNFC_INCLUDE_DIRS ${LIBNFC_INCLUDE_DIR} )
+  list ( APPEND LIBNFC_INCLUDE_DIRS ${LIBUSB_INCLUDE_DIRS} )
+  set ( LIBNFC_LIBRARY nfc )
+  set ( LIBNFC_LIBRARIES ${LIBNFC_LIBRARY} )
+  list ( APPEND LIBNFC_LIBRARIES ${LIBUSB_LIBRARIES} )
+  set ( LIBNFC_LIBRARY_DIRS ${libdir} )
+  set ( LIBNFC_ROOT_DIR ${prefix} )
+  set ( LIBNFC_VERSION_STRING ${VERSION} )
+  set ( LIBNFC_VERSION_MAJOR ${VERSION_MAJOR} )
+  set ( LIBNFC_VERSION_MINOR ${VERSION_MINOR} )
+  set ( LIBNFC_VERSION_PATCH ${VERSION_PATCH} )
+
+  set ( LIBNFC_USE_FILE ${CMAKE_INSTALL_PREFIX}/${LIBNFC_CMAKE_CONFIG_DIR}/UseLibNFC.cmake )
+
+
+          
+  if(CMAKE_VERSION VERSION_LESS 2.8.8)
+    configure_file ( cmake/LibNFCConfig.cmake.in ${CMAKE_CURRENT_BINARY_DIR}/LibNFCConfig.cmake @ONLY )
+    configure_file ( cmake/LibNFCConfigVersion.cmake.in ${CMAKE_CURRENT_BINARY_DIR}/LibNFCConfigVersion.cmake @ONLY )
+  else ()
+    include(CMakePackageConfigHelpers)
+    configure_package_config_file (
+      cmake/LibNFCConfig.cmake.in
+      ${CMAKE_CURRENT_BINARY_DIR}/LibNFCConfig.cmake
+      INSTALL_DESTINATION ${LIBNFC_CMAKE_CONFIG_DIR}
+      PATH_VARS
+        LIBNFC_USE_FILE
+        LIBNFC_ROOT_DIR
+        LIBNFC_INCLUDE_DIR
+        LIBNFC_INCLUDE_DIRS
+        LIBNFC_LIBRARY_DIRS
+        NO_CHECK_REQUIRED_COMPONENTS_MACRO
+    )
+    write_basic_package_version_file (
+      LibNFCConfigVersion.cmake 
+      VERSION ${LIBNFC_VERSION_STRING} 
+      COMPATIBILITY AnyNewerVersion
+    )
+  endif ()
+   
+  install ( FILES ${CMAKE_CURRENT_BINARY_DIR}/LibNFCConfig.cmake
+                  ${CMAKE_CURRENT_BINARY_DIR}/LibNFCConfigVersion.cmake
+                  cmake/UseLibNFC.cmake
+            DESTINATION ${LIBNFC_CMAKE_CONFIG_DIR}
+          )
+   
+endif ()
 
 # Binary Package
 IF(WIN32)
